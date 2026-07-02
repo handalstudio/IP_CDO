@@ -1,5 +1,17 @@
 /* ============================================================
    CORE-BACKUP.JS — Modul Backup, Restore & Reset Data (Lego Brick #12)
+   v2 — PERBAIKAN BUG restore(): sebelumnya, kalau record untuk suatu
+   key SUDAH ADA di DB tapi field array-nya (mis. 'trx') KOSONG —
+   misalnya karena semua nota di tanggal itu sudah dihapus satu-satu
+   dari dalam app, bukan lewat "Hapus Semua Data" — maka restore()
+   mengira "record sudah ada, tidak perlu dipulihkan" dan melewatinya
+   (skipped), padahal seharusnya diisi ulang dari file backup. Data
+   pun tidak pernah tampil lagi walau restore "berhasil" tanpa error.
+   Sekarang: record yang ada tapi array-nya kosong/tidak ada dianggap
+   SETARA dengan "belum ada data" -> tetap dipulihkan dari backup.
+   Perilaku lama untuk app tanpa mergeArrayField (mis. non-katalog)
+   TIDAK berubah — existing record tetap dilindungi (skipped) seperti
+   sebelumnya.
    ------------------------------------------------------------
    Dipakai oleh: SEMUA app Chicken Day yang menyimpan data lewat CoreDB
    (yaitu hampir semua app — IP, RO, dan outlet baru)
@@ -95,7 +107,7 @@
 
     const outlet = cfg.getOutlet() || '';
     const today = (new Date()).toISOString().slice(0,10);
-    const defNama = opts.namaFileDefault || `${cfg.namaPrefix}_FC_${outlet?outlet+'_':''}${today}`;
+    const defNama = opts.namaFileDefault || `${cfg.namaPrefix}_IP_FC_${outlet?outlet+'_':''}${today}`;
 
     let nama = defNama;
     if(typeof opts.confirm === 'function'){
@@ -156,9 +168,16 @@
       const existing = await cfg.db.get(k);
       const masuk = backup.data[k];
 
-      if(existing && cfg.mergeArrayField && existing[cfg.mergeArrayField] && existing[cfg.mergeArrayField].length){
+      // (v2) Untuk app yang punya mergeArrayField (tipe Katalog/Ledger dkk):
+      // anggap array kosong/tidak ada di record existing SAMA SEPERTI belum
+      // ada data sama sekali -> tetap layak dipulihkan dari backup. Sebelumnya
+      // kondisi ini jatuh ke cabang "skipped" dan data dari backup dibuang diam-diam.
+      const existingArr = cfg.mergeArrayField ? (existing && existing[cfg.mergeArrayField]) : null;
+      const existingPunyaIsi = !!(existingArr && existingArr.length);
+
+      if(existing && cfg.mergeArrayField && existingPunyaIsi){
         // record sudah ada & punya isi (mis. sudah ada transaksi hari itu) -> gabung, jangan timpa
-        const arrLama = existing[cfg.mergeArrayField];
+        const arrLama = existingArr;
         const kunciLama = new Set(arrLama.map(x => x[cfg.mergeKeyField]));
         const arrBaru = (masuk[cfg.mergeArrayField] || []).filter(x => !kunciLama.has(x[cfg.mergeKeyField]));
         if(arrBaru.length){
@@ -173,7 +192,14 @@
         obj[cfg.keyPath] = obj[cfg.keyPath] || k;
         await cfg.db.put(obj);
         restored++;
+      } else if(cfg.mergeArrayField && !existingPunyaIsi){
+        // (v2) record ADA tapi array-nya kosong/tidak ada -> isi ulang dari backup
+        const obj = Object.assign({}, existing, masuk);
+        obj[cfg.keyPath] = obj[cfg.keyPath] || k;
+        await cfg.db.put(obj);
+        restored++;
       } else {
+        // app tanpa mergeArrayField & record sudah ada -> lindungi, jangan timpa (perilaku lama)
         skipped++;
       }
     }

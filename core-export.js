@@ -1,5 +1,8 @@
 /* ============================================================
    CORE-EXPORT.JS — Modul Export Excel (Lego Brick #10)
+   v2 — tambahan: builder Lapis 2 utk tipe app ABSENSI (lihat
+   sheetRekapAbsensiRingkasan/sheetRekapAbsensiDetail di bawah).
+   Builder lama (Katalog/Ledger) TIDAK berubah.
    ------------------------------------------------------------
    Dipakai oleh: SEMUA app Chicken Day yang punya fitur "export
    data ke Excel" — yaitu HAMPIR SEMUA app, karena ini inti dari
@@ -76,6 +79,31 @@
        await CoreExport.unduh({
          sheets: [{ nama:'Rekap Kas', ws: sheet1 }],
          namaFileDefault: `RO_${tglHariIni}_CD_${getNamaOutlet()}`,
+         confirm: CoreConfirm.show
+       });
+     }
+   ============================================================
+   CONTOH PAKAI — APP TIPE ABSENSI (mis. Absensi Toko, dipadukan
+   dengan CoreShift.rekapBulanan() utk hitung ringkasan & detail):
+
+     async function exportExcel(bulanStr){
+       const { ringkasan, detail } = await hitungRekapBulanan(bulanStr);
+
+       const sheet1 = CoreExport.sheetRekapAbsensiRingkasan({
+         ringkasan,
+         judulAtas: [['Bulan', bulanStr], ['Toko', 'Absensi Toko']]
+       });
+       const sheet2 = CoreExport.sheetRekapAbsensiDetail({
+         detail,
+         judulAtas: [['Bulan', bulanStr]]
+       });
+
+       await CoreExport.unduh({
+         sheets: [
+           { nama:'Rekap Bulanan', ws: sheet1 },
+           { nama:'Detail Harian', ws: sheet2 }
+         ],
+         namaFileDefault: `Absensi-${bulanStr}`,
          confirm: CoreConfirm.show
        });
      }
@@ -235,9 +263,54 @@
     return buatSheet(aoa, opts.colWidths || [5,20,30,12,12,12,16]);
   }
 
+  /* ============================================================
+     LAPIS 2 — BUILDER: APP TIPE ABSENSI (mis. Absensi Toko)            [v2]
+     ringkasan: dari CoreShift.rekapBulanan(...).ringkasan
+       -> [{id, nama, hadir, normal, lembur, telat}, ...] (menit)
+     detail: dari CoreShift.rekapBulanan(...).detail
+       -> [{tanggal, nama, shift, masuk, pulang, normal, lembur, telat, keterangan}, ...]
+     Catatan: jam kerja disimpan sebagai ANGKA MENIT mentah (bukan teks
+     "Xj Ym") supaya bisa di-SUM langsung di Excel; satuan ditandai di
+     judul kolom.
+     ============================================================ */
+
+  function sheetRekapAbsensiRingkasan(opts){
+    opts = opts || {};
+    const ringkasan = opts.ringkasan || [];
+    const judulAtas = opts.judulAtas || [];
+
+    const aoa = [...judulAtas, [], ['Nama','Hadir (hari)','Jam Normal (menit)','Jam Lembur (menit)','Telat (menit)']];
+    const HDR = aoa.length;
+    ringkasan.forEach(r => aoa.push([r.nama, r.hadir, r.normal, r.lembur, r.telat]));
+
+    const rAwal = HDR+1, rAkhir = HDR+ringkasan.length;
+    aoa.push([]);
+    aoa.push(['TOTAL',
+      { f:`SUM(B${rAwal}:B${rAkhir})` },
+      { f:`SUM(C${rAwal}:C${rAkhir})` },
+      { f:`SUM(D${rAwal}:D${rAkhir})` },
+      { f:`SUM(E${rAwal}:E${rAkhir})` }
+    ]);
+
+    return buatSheet(aoa, opts.colWidths || [24,12,16,16,12]);
+  }
+
+  function sheetRekapAbsensiDetail(opts){
+    opts = opts || {};
+    const detail = opts.detail || [];
+    const judulAtas = opts.judulAtas || [];
+
+    const aoa = [...judulAtas, [],
+      ['Tanggal','Nama','Shift','Jam Masuk','Jam Pulang','Jam Normal (menit)','Jam Lembur (menit)','Telat (menit)','Keterangan']];
+    detail.forEach(d => aoa.push([d.tanggal, d.nama, d.shift, d.masuk, d.pulang, d.normal, d.lembur, d.telat, d.keterangan||'']));
+
+    return buatSheet(aoa, opts.colWidths || [12,20,10,10,10,14,14,10,24]);
+  }
+
   window.CoreExport = {
     buatSheet, unduh,
     sheetRekapKatalog, sheetDetailNotaKatalog,
-    sheetLedger
+    sheetLedger,
+    sheetRekapAbsensiRingkasan, sheetRekapAbsensiDetail
   };
 })();

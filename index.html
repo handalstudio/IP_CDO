@@ -1103,7 +1103,7 @@ async function exportExcel(){
     strukItem: state.struk.item, strukOmzet: state.struk.omzet
   });
   const sheet2=CoreExport.sheetDetailNotaKatalog({ trx: state.trx });
-  const defNama=`IP_${state.tanggal}_FC_${CoreSettings.getOutlet()}`;
+  const defNama=`IP_FC_${CoreSettings.getOutlet()}_${state.tanggal}`;
 
   await CoreExport.unduh({
     sheets:[{nama:'Rekap Item',ws:sheet1},{nama:'Detail Nota',ws:sheet2}],
@@ -1121,7 +1121,10 @@ async function exportExcel(){
 
 /* ---- backup, restore, reset (CoreBackup) ---- */
 async function backupJSON(){
+  const outlet=CoreSettings.getOutlet();
+  const today=CoreFormat.todayStr();
   await CoreBackup.unduh({
+    namaFileDefault:`backup_IP_FC_${outlet?outlet+'_':''}${today}`,
     confirm: CoreConfirm.show,
     onKosong: ()=>CoreToast.show('Tidak ada data untuk dibackup'),
     onSelesai: (nama)=>CoreToast.show(`✓ Backup diunduh: ${nama}`)

@@ -1,5 +1,11 @@
 /* ============================================================
    CORE-FORMAT.JS — Modul Format Angka & Tanggal Indonesia (Lego Brick #11)
+   v3 — tambahan: bulanPanjang() utk format 'YYYY-MM'->'Juli 2026'
+   (dipakai mis. di judul pesan WA rekap bulanan). Fungsi v1/v2 TIDAK
+   berubah.
+   v2 — tambahan: durasi() utk format menit->"Xj Ym", tambahHari()
+   untuk geser tanggal. Fungsi lama TIDAK berubah (aman ditimpa
+   ke app lain yang sudah pakai versi sebelumnya).
    ------------------------------------------------------------
    Dipakai oleh: SEMUA app Chicken Day (IP, RO, dan outlet baru)
 
@@ -25,11 +31,26 @@
 
    4. Membersihkan string berformat ribuan jadi angka murni lagi:
         CoreFormat.bersihkanAngka('125.000')   // -> '125000' (string, hanya digit)
+
+   5. (BARU v2) Format durasi dalam menit jadi teks "Xj Ym", dipakai
+      mis. utk app yang menghitung jam kerja/lembur/telat:
+        CoreFormat.durasi(125)    // -> '2j 05m'
+        CoreFormat.durasi(-15)    // -> '-0j 15m'
+        CoreFormat.durasi(null)   // -> '-'
+
+   6. (BARU v2) Geser tanggal N hari (boleh negatif utk mundur):
+        CoreFormat.tambahHari('2026-07-01', -1)   // -> '2026-06-30'
+        CoreFormat.tambahHari('2026-07-01', 7)    // -> '2026-07-08'
+
+   7. (BARU v3) Format bulan 'YYYY-MM' jadi teks panjang Indonesia:
+        CoreFormat.bulanPanjang('2026-07')   // -> 'Juli 2026'
    ============================================================ */
 (function(){
 
   const NAMA_BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
   const NAMA_HARI = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+
+  function pad2(n){ return n.toString().padStart(2,'0'); }
 
   function rupiah(n){
     return 'Rp '+(n||0).toLocaleString('id-ID');
@@ -48,7 +69,7 @@
 
   function todayStr(){
     const d = new Date();
-    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
   }
 
   // tgl: string 'YYYY-MM-DD' -> '1 Juli 2026'
@@ -67,8 +88,31 @@
     return namaHari(tgl)+', '+tglPanjang(tgl);
   }
 
+  // (v2) menit (boleh negatif) -> 'Xj Ym'. null/undefined -> '-'
+  function durasi(totalMenit){
+    if(totalMenit == null) return '-';
+    const sign = totalMenit < 0 ? '-' : '';
+    const t = Math.abs(Math.round(totalMenit));
+    const h = Math.floor(t/60), m = t%60;
+    return `${sign}${h}j ${pad2(m)}m`;
+  }
+
+  // (v2) geser tanggal 'YYYY-MM-DD' sebanyak n hari (boleh negatif)
+  function tambahHari(tgl, n){
+    const [y,m,d] = tgl.split('-').map(Number);
+    const dt = new Date(y, m-1, d+n);
+    return dt.getFullYear()+'-'+pad2(dt.getMonth()+1)+'-'+pad2(dt.getDate());
+  }
+
+  // (v3) bulan: string 'YYYY-MM' -> 'Juli 2026'
+  function bulanPanjang(bulanStr){
+    const [y,m] = bulanStr.split('-');
+    return `${NAMA_BULAN[+m-1]} ${y}`;
+  }
+
   window.CoreFormat = {
     rupiah, bersihkanAngka, formatRibuan,
-    todayStr, tglPanjang, namaHari, tglHeader
+    todayStr, tglPanjang, namaHari, tglHeader,
+    durasi, tambahHari, bulanPanjang
   };
 })();
