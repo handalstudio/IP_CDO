@@ -1,6 +1,6 @@
 // PENTING: naikkan angka versi ini SETIAP kali ada file yang diedit,
 // jika tidak, HP staf akan tetap memuat versi lama dari cache.
-const CACHE = 'cdo-penjualan-v1.1.0';
+const CACHE = 'cdo-penjualan-v1.2.0';
 const ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const ASSETS = [
   './icon-192.png',
   './icon-512.png',
   './core-toast.js',
+  './core-nav.js',
   './core-confirm.js',
   './core-format.js',
   './core-settings.js',

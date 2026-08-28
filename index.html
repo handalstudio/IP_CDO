@@ -689,6 +689,7 @@ main{padding:16px;max-width:560px;margin:0 auto;padding-bottom:90px;}
      tapi disusun rapi: util generik dulu, baru yang bergantung data.
      ============================================================ -->
 <script src="core-toast.js"></script>
+<script src="core-nav.js"></script>
 <script src="core-confirm.js"></script>
 <script src="core-format.js"></script>
 <script src="core-settings.js"></script>
@@ -964,6 +965,7 @@ function bukaEditNota(i){
   document.getElementById('modalCariHasil').innerHTML='';
   renderModalEdit();
   document.getElementById('modalOverlay').classList.remove('hidden');
+  navModalId=CoreNav.push(()=>{ navModalId=null; bersihkanModal(); },'modalEditNota');
 }
 
 function renderModalEdit(){
@@ -998,6 +1000,13 @@ async function simpanEdit(){
 }
 
 function tutupModal(){
+  if(navModalId!==null){ CoreNav.pop(); return; }
+  bersihkanModal();
+}
+
+// Isi asli tutupModal — dipisah supaya bisa dipanggil dari callback CoreNav
+// saat user menekan tombol back HP, bukan tombol Batal di layar.
+function bersihkanModal(){
   document.getElementById('modalOverlay').classList.add('hidden');
   editNotaIdx=null;editCart.kosongkanKeranjang();
   document.getElementById('modalCari').value='';
@@ -1160,8 +1169,18 @@ async function cekReminderBackup(){
   await CoreBackup.cekReminder({ onIngatkan: (pesan)=>CoreToast.show(pesan) });
 }
 
+/* ---- CoreNav: id layer aktif (null = layer belum terdaftar) ---- */
+let navTabId=null,navPanelId=null,navModalId=null;
+
 /* ---- tab switching ---- */
 function ganti(tab){
+  if(tab==='input'){
+    // Lepaskan jangkar back dulu; callback-nya yang memanggil ganti('input')
+    // kembali, supaya jalur "tap tab Input" dan "tekan back" identik.
+    if(navTabId!==null){ CoreNav.pop(); return; }
+  }else if(navTabId===null){
+    navTabId=CoreNav.push(()=>{ navTabId=null; ganti('input'); },'tab');
+  }
   ['input','trx','rekap'].forEach(t=>{
     document.getElementById('v'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('hidden',t!==tab);
     const btn=document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1));
@@ -1181,8 +1200,13 @@ function bukaPengaturan(){
   document.getElementById('inputOutlet').value=outlet;
   document.getElementById('statusOutlet').textContent=outlet?'✓ Tersimpan: '+outlet:'';
   document.getElementById('panelSetting').classList.remove('hidden');
+  navPanelId=CoreNav.push(()=>{
+    navPanelId=null;
+    document.getElementById('panelSetting').classList.add('hidden');
+  },'panelSetting');
 }
 function tutupPengaturan(){
+  if(navPanelId!==null){ CoreNav.pop(); return; }
   document.getElementById('panelSetting').classList.add('hidden');
 }
 document.getElementById('panelSetting').addEventListener('click',e=>{
@@ -1242,6 +1266,7 @@ document.getElementById('tglHari').addEventListener('change',async function(){
 
 /* ---- INIT ---- */
 (async function init(){
+  CoreNav.init();   // jangkar riwayat: tombol back HP tidak langsung menutup app
   try{
     await CoreDB.buka({ dbName:'cdo_DB', versi:1, store:'penjualan', keyPath:'tanggal' });
     const today=CoreFormat.todayStr();
